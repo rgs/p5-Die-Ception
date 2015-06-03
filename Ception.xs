@@ -20,11 +20,11 @@ dopoptoeval_in_package(pTHX_ I32 startingblock, SV *package_name)
                 ? HvNAME_HEK((HV*)CopSTASH(cx->blk_oldcop))
                 : NULL;
             if (stash_hek)
-                Perl_sv_sethek((tmpstr = sv_newmortal()), stash_hek);
+                Perl_sv_sethek(aTHX_ (tmpstr = sv_newmortal()), stash_hek);
 #ifdef DC_DEBUGGING
             PerlIO_printf(Perl_debug_log, "Found eval in <%s> from stack type %d\n", stash_hek ? SvPV_nolen(tmpstr) : "undef", PL_curstackinfo->si_type);
 #endif
-            if (Perl_sv_eq_flags(tmpstr, package_name, 0)) {
+            if (Perl_sv_eq_flags(aTHX_ tmpstr, package_name, 0)) {
 #ifdef DC_DEBUGGING
                 PerlIO_printf(Perl_debug_log, "Returning cxix %d\n", i);
 #endif
@@ -126,8 +126,8 @@ die_until_package(package_name, msv)
 	}
         else {
             /* package not found ? then die horribly, bypassing all evals */
-            Perl_write_to_stderr(exceptsv);
-            Perl_my_failure_exit();
+            Perl_write_to_stderr(aTHX_ exceptsv);
+            Perl_my_failure_exit(aTHX);
         }
     }
     else
