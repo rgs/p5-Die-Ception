@@ -22,11 +22,11 @@ dopoptoeval_in_package(pTHX_ I32 startingblock, SV *package_name)
             if (stash_hek)
                 Perl_sv_sethek(aTHX_ (tmpstr = sv_newmortal()), stash_hek);
 #ifdef DC_DEBUGGING
-            PerlIO_printf(Perl_debug_log, "Found eval in <%s> from stack type %d\n", stash_hek ? SvPV_nolen(tmpstr) : "undef", PL_curstackinfo->si_type);
+            PerlIO_printf(Perl_debug_log, "Found eval in <%s> from stack type %ld\n", stash_hek ? SvPV_nolen(tmpstr) : "undef", (long)PL_curstackinfo->si_type);
 #endif
             if (Perl_sv_eq_flags(aTHX_ tmpstr, package_name, 0)) {
 #ifdef DC_DEBUGGING
-                PerlIO_printf(Perl_debug_log, "Returning cxix %d\n", i);
+                PerlIO_printf(Perl_debug_log, "Returning cxix %ld\n", (long)i);
 #endif
                 return i;
             }
@@ -64,7 +64,7 @@ die_until_package(package_name, msv)
 	       && PL_curstackinfo->si_prev)
 	{
 #ifdef DC_DEBUGGING
-            PerlIO_printf(Perl_debug_log, "dounwind to the last item from SI type %d\n", PL_curstackinfo->si_type);
+            PerlIO_printf(Perl_debug_log, "dounwind to the last item from SI type %ld\n", (long)PL_curstackinfo->si_type);
 #endif
 	    dounwind(-1);
 	    POPSTACK;
@@ -80,7 +80,7 @@ die_until_package(package_name, msv)
 
 	    if (cxix < cxstack_ix) {
 #ifdef DC_DEBUGGING
-                PerlIO_printf(Perl_debug_log, "dounwind to cxix %d from SI type %d\n", cxix, PL_curstackinfo->si_type);
+                PerlIO_printf(Perl_debug_log, "dounwind to cxix %ld from SI type %ld\n", (long)cxix, (long)PL_curstackinfo->si_type);
 #endif
 		dounwind(cxix);
             }
