@@ -61,8 +61,6 @@ static I32
 dopoptoeval_in_package(pTHX_ I32 startingblock, SV *package_name)
 {
     I32 i, optype;
-    HEK *stash_hek;
-    SV *tmpstr;
 #ifdef DC_DEBUGGING
     Perl_warn(aTHX_ "dopoptoeval_in_package %d <%s> si_type %ld\n",
               startingblock, SvPV_nolen(package_name),
@@ -70,27 +68,25 @@ dopoptoeval_in_package(pTHX_ I32 startingblock, SV *package_name)
 #endif
     for (i = startingblock; i >= 0; i--) {
         const PERL_CONTEXT *cx = &cxstack[i];
-        switch (CxTYPE(cx)) {
-        default:
-            continue;
-        case CXt_EVAL:
+        if (CxTYPE(cx) == CXt_EVAL &&
+            SvTYPE(CopSTASH(cx->blk_oldcop)) == SVt_PVHV) {
             /* perl's S_dopoptoeval returns i unconditionally;
              * here we test for the current package name instead */
-            stash_hek = SvTYPE(CopSTASH(cx->blk_oldcop)) == SVt_PVHV
-                ? HvNAME_HEK((HV*)CopSTASH(cx->blk_oldcop))
-                : NULL;
-            if (stash_hek)
-                Perl_sv_sethek(aTHX_ (tmpstr = sv_newmortal()), stash_hek);
+            HEK *stash_hek = HvNAME_HEK((HV*)CopSTASH(cx->blk_oldcop));
+            if (stash_hek) {
+                SV *tmpstr = sv_newmortal();
+                Perl_sv_sethek(aTHX_ tmpstr, stash_hek);
 #ifdef DC_DEBUGGING
-            Perl_warn(aTHX_ "Found eval in <%s> cxix %d\n",
-                      stash_hek ? SvPV_nolen(tmpstr) : "undef", i);
+                Perl_warn(aTHX_ "Found eval in <%s> cxix %d\n",
+                          SvPV_nolen(tmpstr), i);
 #endif
-            if (Perl_sv_eq_flags(aTHX_ tmpstr, package_name, 0)) {
+                if (Perl_sv_eq_flags(aTHX_ tmpstr, package_name, 0)) {
 #ifdef DC_DEBUGGING
-                Perl_warn(aTHX_ "Found package <%s> cxix %d\n",
-                          SvPV_nolen(package_name), i);
+                    Perl_warn(aTHX_ "Found package <%s> cxix %d\n",
+                              SvPV_nolen(package_name), i);
 #endif
-                return i;
+                    return i;
+                }
             }
         }
     }
