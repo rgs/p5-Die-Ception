@@ -81,14 +81,14 @@ dopoptoeval_in_package(pTHX_ I32 startingblock, SV *package_name)
 #endif
             if (Perl_sv_eq_flags(aTHX_ tmpstr, package_name, 0)) {
 #ifdef DC_DEBUGGING
-                Perl_warn(aTHX_ "Returning cxix %ld\n", (long)i);
+                Perl_warn(aTHX_ "Found package <%s>, returning cxix %ld\n", SvPV_nolen(package_name), (long)i);
 #endif
                 return i;
             }
         }
     }
 #ifdef DC_DEBUGGING
-    Perl_warn(aTHX_ "Returning cxix %ld\n", (long)i);
+    Perl_warn(aTHX_ "Not found package <%s>, returning cxix %ld\n", SvPV_nolen(package_name), (long)i);
 #endif
     return i;
 }
