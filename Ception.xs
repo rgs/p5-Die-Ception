@@ -63,6 +63,11 @@ dopoptoeval_in_package(pTHX_ I32 startingblock, SV *package_name)
     I32 i, optype;
     HEK *stash_hek;
     SV *tmpstr;
+#ifdef DC_DEBUGGING
+    Perl_warn(aTHX_ "dopoptoeval_in_package %d <%s> si_type %ld\n",
+              startingblock, SvPV_nolen(package_name),
+              (long)PL_curstackinfo->si_type);
+#endif
     for (i = startingblock; i >= 0; i--) {
         const PERL_CONTEXT *cx = &cxstack[i];
         switch (CxTYPE(cx)) {
@@ -77,18 +82,21 @@ dopoptoeval_in_package(pTHX_ I32 startingblock, SV *package_name)
             if (stash_hek)
                 Perl_sv_sethek(aTHX_ (tmpstr = sv_newmortal()), stash_hek);
 #ifdef DC_DEBUGGING
-            Perl_warn(aTHX_ "Found eval in <%s>, si_type %ld\n", stash_hek ? SvPV_nolen(tmpstr) : "undef", (long)PL_curstackinfo->si_type);
+            Perl_warn(aTHX_ "Found eval in <%s> cxix %d\n",
+                      stash_hek ? SvPV_nolen(tmpstr) : "undef", i);
 #endif
             if (Perl_sv_eq_flags(aTHX_ tmpstr, package_name, 0)) {
 #ifdef DC_DEBUGGING
-                Perl_warn(aTHX_ "Found package <%s>, returning cxix %ld\n", SvPV_nolen(package_name), (long)i);
+                Perl_warn(aTHX_ "Found package <%s> cxix %d\n",
+                          SvPV_nolen(package_name), i);
 #endif
                 return i;
             }
         }
     }
 #ifdef DC_DEBUGGING
-    Perl_warn(aTHX_ "Not found package <%s>, returning cxix %ld\n", SvPV_nolen(package_name), (long)i);
+    Perl_warn(aTHX_ "Not found package <%s> cxix %ld\n",
+              SvPV_nolen(package_name), (long)i);
 #endif
     return i;
 }
@@ -124,7 +132,7 @@ die_until_package(package_name, msv)
 	       && PL_curstackinfo->si_prev)
 	{
 #ifdef DC_DEBUGGING
-            Perl_warn(aTHX_ "dounwind until empty, si_type %ld\n", (long)PL_curstackinfo->si_type);
+            Perl_warn(aTHX_ "dounwind until empty\n");
 #endif
 	    dounwind(-1);
 #ifdef DC_DEBUGGING
@@ -149,7 +157,7 @@ die_until_package(package_name, msv)
 
 	    if (cxix < cxstack_ix) {
 #ifdef DC_DEBUGGING
-                Perl_warn(aTHX_ "dounwind to cxix %ld, si_type %ld\n", (long)cxix, (long)PL_curstackinfo->si_type);
+                Perl_warn(aTHX_ "dounwind to cxix %ld si_type %ld\n", (long)cxix, (long)PL_curstackinfo->si_type);
 #endif
 		dounwind(cxix);
 #ifdef DC_DEBUGGING
