@@ -2,6 +2,61 @@
 #include "perl.h"
 #include "XSUB.h"
 
+/* This is a mini version of deb.c:deb_stack_all(). */
+static void deb_stack(pTHX) {
+#ifdef DC_DEBUGGING
+  static const char * const si_names[] =
+  {
+   "UNKNOWN",
+   "UNDEF",
+   "MAIN",
+   "MAGIC",
+   "SORT",
+   "SIGNAL",
+    "OVERLOAD",
+   "DESTROY",
+   "WARNHOOK",
+   "DIEHOOK",
+   "REQUIRE"
+  };
+  char* const PL_block_type[] =
+  {
+   "NULL",
+   "WHEN",
+   "BLOCK",
+   "GIVEN",
+   "LOOP_FOR",
+   "LOOP_PLAIN",
+   "LOOP_LAZYSV",
+   "LOOP_LAZYIV",
+   "SUB",
+   "FORMAT",
+   "EVAL",
+   "SUBST"
+  };
+  const PERL_SI *si = PL_curstackinfo;
+  int siix;
+  while (si->si_prev) {
+    si = si->si_prev;
+  }
+  for (siix = 0; si; si = si->si_next, siix++) {
+    I32 cxix;
+    Perl_warn(aTHX_ "stack %d type %s(%d) %p\n",
+              siix, si_names[si->si_type + 1], si->si_type, si);
+    for (cxix = 0; cxix <= si->si_cxix; cxix++) {
+      const PERL_CONTEXT* const cx = &(si->si_cxstack[cxix]);
+      Perl_warn(aTHX_ "\tcx %d type %s(%d)\n",
+                cxix, PL_block_type[CxTYPE(cx)], CxTYPE(cx));
+    }
+    if (si == PL_curstackinfo) {
+      break;
+    }
+  }
+#else
+  PERL_UNUSED_CONTEXT;
+#endif
+}
+
 static I32
 dopoptoeval_in_package(pTHX_ I32 startingblock, SV *package_name)
 {
@@ -62,7 +117,9 @@ die_until_package(package_name, msv)
 	    Perl_ck_warner(aTHX_ packWARN(WARN_MISC), "\t(in cleanup) %"SVf,
 			   SVfARG(exceptsv));
 	}
-
+#ifdef DC_DEBUGGING
+        deb_stack(aTHX);
+#endif
 	while ((cxix = dopoptoeval_in_package(aTHX_ cxstack_ix, package_name)) < 0
 	       && PL_curstackinfo->si_prev)
 	{
@@ -70,8 +127,17 @@ die_until_package(package_name, msv)
             Perl_warn(aTHX_ "dounwind until empty, si_type %ld\n", (long)PL_curstackinfo->si_type);
 #endif
 	    dounwind(-1);
+#ifdef DC_DEBUGGING
+            Perl_warn(aTHX_ "popstack\n");
+#endif
 	    POPSTACK;
+#ifdef DC_DEBUGGING
+            deb_stack(aTHX);
+#endif
 	}
+#ifdef DC_DEBUGGING
+        deb_stack(aTHX);
+#endif
 
 	if (cxix >= 0) {
 	    I32 optype;
@@ -86,6 +152,9 @@ die_until_package(package_name, msv)
                 Perl_warn(aTHX_ "dounwind to cxix %ld, si_type %ld\n", (long)cxix, (long)PL_curstackinfo->si_type);
 #endif
 		dounwind(cxix);
+#ifdef DC_DEBUGGING
+		deb_stack(aTHX);
+#endif
             }
 
 	    POPBLOCK(cx,PL_curpm);
