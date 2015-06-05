@@ -3,14 +3,6 @@ use warnings;
 use Test::More tests => 4;
 use Die::Ception ':all';
 
-my @warn;
-local $SIG{__WARN__} = sub { push @warn, $_[0] };
-END {
-    for my $warn (@warn) {
-      print "# $warn";
-    }
-}
-
 our $where_to_die;
 our $where_died;
 

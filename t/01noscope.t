@@ -4,14 +4,6 @@ use Test::More tests => 7;
 
 BEGIN { use_ok 'Die::Ception', ':all' }
 
-my @warn;
-local $SIG{__WARN__} = sub { push @warn, $_[0] };
-END {
-    for my $warn (@warn) {
-      print "# $warn";
-    }
-}
-
 my $eval_ok = eval { die_until_package("main","foo\n"); 1 };
 my $err = $@;
 ok(!$eval_ok, 'eval died');
