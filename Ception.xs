@@ -2,36 +2,98 @@
 #include "perl.h"
 #include "XSUB.h"
 
+/* This is a mini version of deb.c:deb_stack_all(). */
+static void deb_stack(pTHX) {
+#ifdef DC_DEBUGGING
+  static const char * const si_names[] =
+  {
+   "UNKNOWN",
+   "UNDEF",
+   "MAIN",
+   "MAGIC",
+   "SORT",
+   "SIGNAL",
+    "OVERLOAD",
+   "DESTROY",
+   "WARNHOOK",
+   "DIEHOOK",
+   "REQUIRE"
+  };
+  char* const PL_block_type[] =
+  {
+   "NULL",
+   "WHEN",
+   "BLOCK",
+   "GIVEN",
+   "LOOP_FOR",
+   "LOOP_PLAIN",
+   "LOOP_LAZYSV",
+   "LOOP_LAZYIV",
+   "SUB",
+   "FORMAT",
+   "EVAL",
+   "SUBST"
+  };
+  const PERL_SI *si = PL_curstackinfo;
+  int siix;
+  while (si->si_prev) {
+    si = si->si_prev;
+  }
+  for (siix = 0; si; si = si->si_next, siix++) {
+    I32 cxix;
+    Perl_warn(aTHX_ "stack %d type %s(%d) %p\n",
+              siix, si_names[si->si_type + 1], si->si_type, si);
+    for (cxix = 0; cxix <= si->si_cxix; cxix++) {
+      const PERL_CONTEXT* const cx = &(si->si_cxstack[cxix]);
+      Perl_warn(aTHX_ "\tcx %d type %s(%d)\n",
+                cxix, PL_block_type[CxTYPE(cx)], CxTYPE(cx));
+    }
+    if (si == PL_curstackinfo) {
+      break;
+    }
+  }
+#else
+  PERL_UNUSED_CONTEXT;
+#endif
+}
+
 static I32
 dopoptoeval_in_package(pTHX_ I32 startingblock, SV *package_name)
 {
     I32 i, optype;
-    HEK *stash_hek;
-    SV *tmpstr;
+#ifdef DC_DEBUGGING
+    Perl_warn(aTHX_ "dopoptoeval_in_package %d <%s> si_type %ld\n",
+              startingblock, SvPV_nolen(package_name),
+              (long)PL_curstackinfo->si_type);
+#endif
     for (i = startingblock; i >= 0; i--) {
         const PERL_CONTEXT *cx = &cxstack[i];
-        switch (CxTYPE(cx)) {
-        default:
-            continue;
-        case CXt_EVAL:
+        if (CxTYPE(cx) == CXt_EVAL &&
+            SvTYPE(CopSTASH(cx->blk_oldcop)) == SVt_PVHV) {
             /* perl's S_dopoptoeval returns i unconditionally;
              * here we test for the current package name instead */
-            stash_hek = SvTYPE(CopSTASH(cx->blk_oldcop)) == SVt_PVHV
-                ? HvNAME_HEK((HV*)CopSTASH(cx->blk_oldcop))
-                : NULL;
-            if (stash_hek)
-                Perl_sv_sethek((tmpstr = sv_newmortal()), stash_hek);
+            HEK *stash_hek = HvNAME_HEK((HV*)CopSTASH(cx->blk_oldcop));
+            if (stash_hek) {
+                SV *tmpstr = sv_newmortal();
+                Perl_sv_sethek(aTHX_ tmpstr, stash_hek);
 #ifdef DC_DEBUGGING
-            PerlIO_printf(Perl_debug_log, "Found eval in <%s> from stack type %d\n", stash_hek ? SvPV_nolen(tmpstr) : "undef", PL_curstackinfo->si_type);
+                Perl_warn(aTHX_ "Found eval in <%s> cxix %d\n",
+                          SvPV_nolen(tmpstr), i);
 #endif
-            if (Perl_sv_eq_flags(tmpstr, package_name, 0)) {
+                if (Perl_sv_eq_flags(aTHX_ tmpstr, package_name, 0)) {
 #ifdef DC_DEBUGGING
-                PerlIO_printf(Perl_debug_log, "Returning cxix %d\n", i);
+                    Perl_warn(aTHX_ "Found package <%s> cxix %d\n",
+                              SvPV_nolen(package_name), i);
 #endif
-                return i;
+                    return i;
+                }
             }
         }
     }
+#ifdef DC_DEBUGGING
+    Perl_warn(aTHX_ "Not found package <%s> cxix %ld\n",
+              SvPV_nolen(package_name), (long)i);
+#endif
     return i;
 }
 
@@ -59,16 +121,27 @@ die_until_package(package_name, msv)
 	    Perl_ck_warner(aTHX_ packWARN(WARN_MISC), "\t(in cleanup) %"SVf,
 			   SVfARG(exceptsv));
 	}
-
+#ifdef DC_DEBUGGING
+        deb_stack(aTHX);
+#endif
 	while ((cxix = dopoptoeval_in_package(aTHX_ cxstack_ix, package_name)) < 0
 	       && PL_curstackinfo->si_prev)
 	{
 #ifdef DC_DEBUGGING
-            PerlIO_printf(Perl_debug_log, "dounwind to the last item from SI type %d\n", PL_curstackinfo->si_type);
+            Perl_warn(aTHX_ "dounwind until empty\n");
 #endif
 	    dounwind(-1);
+#ifdef DC_DEBUGGING
+            Perl_warn(aTHX_ "popstack\n");
+#endif
 	    POPSTACK;
+#ifdef DC_DEBUGGING
+            deb_stack(aTHX);
+#endif
 	}
+#ifdef DC_DEBUGGING
+        deb_stack(aTHX);
+#endif
 
 	if (cxix >= 0) {
 	    I32 optype;
@@ -80,9 +153,12 @@ die_until_package(package_name, msv)
 
 	    if (cxix < cxstack_ix) {
 #ifdef DC_DEBUGGING
-                PerlIO_printf(Perl_debug_log, "dounwind to cxix %d from SI type %d\n", cxix, PL_curstackinfo->si_type);
+                Perl_warn(aTHX_ "dounwind to cxix %ld si_type %ld\n", (long)cxix, (long)PL_curstackinfo->si_type);
 #endif
 		dounwind(cxix);
+#ifdef DC_DEBUGGING
+		deb_stack(aTHX);
+#endif
             }
 
 	    POPBLOCK(cx,PL_curpm);
@@ -126,8 +202,8 @@ die_until_package(package_name, msv)
 	}
         else {
             /* package not found ? then die horribly, bypassing all evals */
-            Perl_write_to_stderr(exceptsv);
-            Perl_my_failure_exit();
+            Perl_write_to_stderr(aTHX_ exceptsv);
+            Perl_my_failure_exit(aTHX);
         }
     }
     else
